@@ -1,0 +1,5665 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+
+
+
+<html>
+   <head>
+      <link rel="stylesheet" type="text/css" href="/css/style.css?1">
+
+      <link rel="shortcut icon" href="/favicon.ico">
+
+      <title>/kc/ -
+         
+            Krautchan
+         
+      </title>
+
+      <script type="text/javascript" src="/js/prototype.js"></script>
+      <script type="text/javascript" src="/js/scriptaculous/scriptaculous.js?load=effects,builder,dragdrop"></script>
+      <script type="text/javascript" src="/js/corners.js"></script>
+      <script type="text/javascript" src="/js/browser.js"></script>
+      <script type="text/javascript" src="/js/webtoolkit.js"></script>
+      <script type="text/javascript" src="/js/common.js"></script>
+
+      <script type="text/javascript">
+         var currentHighlighted = null;
+         var board = 'kc';
+
+         
+
+         
+
+         
+         
+
+         
+
+         function fileTooltip(id)
+         {
+            TagToTip('fileinfo_' + id, TITLE, 'Datei',
+               COPYCONTENT, false, SHADOW, true, SHADOWCOLOR, '#333333',
+               WIDTH, -650);
+         }
+
+         function fileNameTooltip(enable, id)
+         {
+            if (BrowserDetect.browser == 'Opera')
+               return;
+
+            else
+            {
+               if (enable)
+                  TagToTip('filename_' + id, DELAY, 400, SHADOW, true,
+                     SHADOWCOLOR, '#333333', COPYCONTENT, false);
+
+               else
+                  UnTip();
+            }
+         }
+
+         function helpTip(text)
+         {
+            Tip(text, DELAY, 400, SHADOW, true, SHADOWCOLOR, '#333333');
+         }
+
+         
+
+         
+
+         function stringEndsWith(s, suffix)
+         {
+            var start = s.length - suffix.length;
+
+            if (start < 0)
+               return(false);
+
+            return(s.lastIndexOf(suffix, start) == start);
+         }
+
+         function toggleThumbnail(id, thumbnailURL, thumbnailWidth,
+            thumbnailHeight, imageURL, imageWidth, imageHeight)
+         {
+            var thumbnail = $('thumbnail_' + id);
+            var button = $('button_expand_image_' + id);
+
+            button.src = '/images/button-working.gif';
+
+            if (stringEndsWith(thumbnail.src, thumbnailURL))
+            {
+               thumbnail.src = imageURL;
+               thumbnail.width = imageWidth;
+               thumbnail.height = imageHeight;
+               return;
+            }
+
+            thumbnail.src = thumbnailURL;
+
+            if (thumbnailWidth == 0)
+               thumbnail.removeAttribute('width');
+
+            else
+               thumbnail.width = thumbnailWidth;
+
+            if (thumbnailHeight == 0)
+               thumbnail.removeAttribute('height');
+
+            else
+               thumbnail.height = thumbnailHeight;
+         }
+
+         function imageFinishedLoading(id)
+         {
+            var img = $('button_expand_image_' + id);
+
+            img.src = "/images/button-expand.gif";
+         }
+
+         function expandPost(postnumber)
+         {
+            var button;
+
+            button = $('button_expand_post_' + postnumber);
+            button.removeAttribute('onclick');
+            button.src = '/images/button-working.gif';
+
+            new Ajax.Request('/expand/kc/post/' + postnumber,
+               { method: 'get',
+                 onSuccess: function(r) { expandPostSuccess(r, postnumber) },
+                 onFailure: function(r) { expandPostFailure(r, postnumber) } });
+         }
+
+         function expandPostFailure(request, postnumber)
+         {
+            var button;
+
+            button = $('button_expand_post_' + postnumber);
+            button.onclick = new Function('expandPost(' + postnumber + ')');
+            button.src = '/images/button-expand.gif';
+         }
+
+         function expandPostSuccess(request, postnumber)
+         {
+            var p;
+
+            p = $('post_truncated_' + postnumber);
+            p.style.display = 'none';
+
+            p = $('post_text_' + postnumber);
+            p.innerHTML = request.responseText;
+         }
+
+         function quote(postnumber)
+         {
+            var textField = $('postform_comment');
+
+            postnumber = ">>" + postnumber;
+
+            // FF
+
+            if (typeof textField.selectionStart != 'undefined')
+            {
+               if (textField.selectionStart == textField.value.length)
+                  postnumber += "\n";
+
+               start = textField.selectionStart;
+               textField.value = textField.value.substr(0, start) + postnumber +
+                  textField.value.substr(start);
+               textField.selectionStart = start + postnumber.length;
+               textField.selectionEnd = start + postnumber.length;
+            }
+
+            // IE
+
+            else if (document.selection)
+            {
+               postnumber += "\n";
+
+               textField.focus();
+
+               selected = document.selection.createRange();
+               selected.text = postnumber + selected.text;
+            }
+
+            // ?
+
+            else
+            {
+               postnumber += "\n";
+
+               textField.value = textField.value + postnumber;
+            }
+         }
+
+         function highlightPost(postnumber)
+         {
+            if (currentHighlighted)
+               currentHighlighted.className = "postreply";
+
+            currentHighlighted = document.getElementById("post-" + postnumber);
+
+            if (currentHighlighted)
+               currentHighlighted.className = "postreply_highlighted";
+         }
+
+         function hideThread(postnumber)
+         {
+            $$('#thread_' + postnumber + ' .thread_body')[0].hide();
+            $$('#thread_' + postnumber + ' .thread_hidden')[0].style.display = 'block';
+
+            addHiddenThread(postnumber);
+         }
+
+         function showThread(postnumber)
+         {
+            $$('#thread_' + postnumber + ' .thread_body')[0].style.display = 'block';
+            $$('#thread_' + postnumber + ' .thread_hidden')[0].hide();
+
+            removeHiddenThread(postnumber);
+         }
+
+         function addHiddenThread(postnumber)
+         {
+            var i;
+
+            hiddenThreads = configGet('board.kc.hiddenthreads');
+
+            if (hiddenThreads == null)
+               hiddenThreads = [];
+
+            for(i = 0; i < hiddenThreads.length; i++)
+               if (hiddenThreads[i] == postnumber)
+                  return;
+
+            hiddenThreads.push(postnumber);
+
+            configSet('board.kc.hiddenthreads', hiddenThreads);
+         }
+
+         function removeHiddenThread(postnumber)
+         {
+            var i;
+
+            hiddenThreads = configGet('board.kc.hiddenthreads');
+
+            if (hiddenThreads == null)
+               return;
+
+            for(i = 0; i < hiddenThreads.length; i++)
+               if (hiddenThreads[i] == postnumber)
+               {
+                  hiddenThreads.splice(i, 1);
+                  i--;
+               }
+
+            configSet('board.kc.hiddenthreads', hiddenThreads);
+         }
+
+         
+         (function hideThreads()
+         {
+            var css = document.createElement('style');
+            var threads = configGet('board.kc.hiddenthreads');
+
+            if ((!threads) || (!threads.length))
+               return;
+
+            else
+            {
+               css.appendChild(document.createTextNode(
+                  '#thread_' + desuConfigLoad()["board."+board+".hiddenthreads"].join(' .thread_body, #thread_') + ' .thread_body {display: none}\n' +
+                  '#thread_' + desuConfigLoad()["board."+board+".hiddenthreads"].join(' .thread_hidden, #thread_') + ' .thread_hidden {display: block}'));
+            }
+
+           document.getElementsByTagName('head')[0].appendChild(css);
+         })();
+         
+      </script>
+
+      
+   </head>
+
+   
+
+   
+
+   <body>
+      <script type="text/javascript" src="/js/tooltip/wz_tooltip.js"></script>
+
+      <div style="float: left">
+      
+      
+      [
+         
+            <a href="/b/" onmouseover="helpTip('Der Prozess')" onmouseout="UnTip()">b</a> /
+         
+            <a href="/int/" onmouseover="helpTip('International')" onmouseout="UnTip()">int</a> /
+         
+            <a href="/vip/" onmouseover="helpTip('Beste der Besten')" onmouseout="UnTip()">vip</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/a/" onmouseover="helpTip('Anime & Manga')" onmouseout="UnTip()">a</a> /
+         
+            <a href="/c/" onmouseover="helpTip('Computer')" onmouseout="UnTip()">c</a> /
+         
+            <a href="/co/" onmouseover="helpTip('Comics & Cartoons')" onmouseout="UnTip()">co</a> /
+         
+            <a href="/d/" onmouseover="helpTip('Drogen')" onmouseout="UnTip()">d</a> /
+         
+            <a href="/e/" onmouseover="helpTip('Essen & Trinken')" onmouseout="UnTip()">e</a> /
+         
+            <a href="/f/" onmouseover="helpTip('Fahrzeuge')" onmouseout="UnTip()">f</a> /
+         
+            <a href="/fb/" onmouseover="helpTip('Frag Bernd')" onmouseout="UnTip()">fb</a> /
+         
+            <a href="/fit/" onmouseover="helpTip('Fitness')" onmouseout="UnTip()">fit</a> /
+         
+            <a href="/jp/" onmouseover="helpTip('Otakuhimmel')" onmouseout="UnTip()">jp</a> /
+         
+            <a href="/k/" onmouseover="helpTip('Kreatives')" onmouseout="UnTip()">k</a> /
+         
+            <a href="/l/" onmouseover="helpTip('Literatur')" onmouseout="UnTip()">l</a> /
+         
+            <a href="/li/" onmouseover="helpTip('Lifestyle')" onmouseout="UnTip()">li</a> /
+         
+            <a href="/m/" onmouseover="helpTip('Musik')" onmouseout="UnTip()">m</a> /
+         
+            <a href="/n/" onmouseover="helpTip('Natur & Tierwelt')" onmouseout="UnTip()">n</a> /
+         
+            <a href="/p/" onmouseover="helpTip('Politik & News')" onmouseout="UnTip()">p</a> /
+         
+            <a href="/ph/" onmouseover="helpTip('Philosophie')" onmouseout="UnTip()">ph</a> /
+         
+            <a href="/sp/" onmouseover="helpTip('Spielzeug')" onmouseout="UnTip()">sp</a> /
+         
+            <a href="/t/" onmouseover="helpTip('Technik')" onmouseout="UnTip()">t</a> /
+         
+            <a href="/tv/" onmouseover="helpTip('Film & Fernsehen')" onmouseout="UnTip()">tv</a> /
+         
+            <a href="/v/" onmouseover="helpTip('Videospiele')" onmouseout="UnTip()">v</a> /
+         
+            <a href="/w/" onmouseover="helpTip('Wissenschaft')" onmouseout="UnTip()">w</a> /
+         
+            <a href="/board/we/" onmouseover="helpTip('Weltschmerz')" onmouseout="UnTip()">we</a> /
+         
+            <a href="/wp/" onmouseover="helpTip('Wallpaper')" onmouseout="UnTip()">wp</a> /
+         
+            <a href="/x/" onmouseover="helpTip('Paranormales')" onmouseout="UnTip()">x</a> /
+         
+            <a href="/z/" onmouseover="helpTip('Zeichnen')" onmouseout="UnTip()">z</a> /
+         
+            <a href="/zp/" onmouseover="helpTip('MS Paint')" onmouseout="UnTip()">zp</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/ng/" onmouseover="helpTip('Geld & Finanz')" onmouseout="UnTip()">ng</a> /
+         
+            <a href="/prog/" onmouseover="helpTip('/prog/')" onmouseout="UnTip()">prog</a> /
+         
+            <a href="/wk/" onmouseover="helpTip('Waffen & Krieg')" onmouseout="UnTip()">wk</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/h/" onmouseover="helpTip('Hentai')" onmouseout="UnTip()">h</a> /
+         
+            <a href="/s/" onmouseover="helpTip('Sexy Frauen')" onmouseout="UnTip()">s</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/kc/" onmouseover="helpTip('Krautchan')" onmouseout="UnTip()">kc</a> /
+         
+            <a href="/rfk/" onmouseover="helpTip('Radio Freies Krautchan')" onmouseout="UnTip()">rfk</a> 
+         
+      ]
+      
+   
+      
+         <b>[ provisorium ]</b>
+      
+      </div>
+
+      <div style="float: right">
+         [<a href="/rss/board-threads/kc">RSS /kc/</a>]
+         
+         [<a href="/" target="_top">Home</a>]
+      </div>
+
+      <div style="clear: both"></div>
+
+      
+      
+      
+
+      
+
+
+      
+
+      
+
+
+      <center>
+
+         <br>
+         <br>
+         <img src="/banner/kc"
+            width="300" height="100" style="border: solid 1px #000000">
+
+         <h1>/kc/ - Krautchan</h1>
+
+         
+
+         <hr>
+
+         
+
+
+   
+
+
+
+
+<form action="/post" name="postform" method=post enctype="multipart/form-data"
+  id="postform" onsubmit="return(onSubmit())">
+   <table class="postform" id="postform_table">
+      <tr style="display: none">
+         <td></td>
+         <td>
+            <input type="text" name="email">
+            <input type="text" name="e-mail">
+            <input type="text" name="subject">
+            <input type="text" name="name">
+            <textarea name="comment"></textarea>
+            <textarea name="text"></textarea>
+         </td>
+      </tr>
+      
+      <tr id="postform_row_name">
+         <td class="label" id="postform_label_name">
+            Name:
+         </td>
+         <td align="left">
+            <input tabindex="1" type="text" name="internal_n" size="28"
+               maxlength="200"
+               onchange="formFieldsChanged()"
+               onfocus="formFieldsChanged()">
+            <input tabindex=2 type=checkbox name="name_remember">
+               Merken
+         </td>
+      </tr>
+      
+      <tr id="postform_row_subject">
+         <td class="label" id="postform_label_subject">
+            Betreff:
+         </td>
+         <td align="left">
+            <input tabindex="3" type="text" name="internal_s" size="35"
+               maxlength="200"
+               onchange="formFieldsChanged()"
+               onfocus="formFieldsChanged()">
+            <input tabindex=6 type=submit id="postform_submit"
+               value="Absenden"
+               accesskey="s">
+         </td>
+      </tr>
+
+      <tr id="postform_row_sage">
+         <td class="label" id="postform_label_sage">
+            Sage
+         </td>
+         <td align="left">
+            <input tabindex="4" type="checkbox" name="sage" value="1"
+               onchange="formFieldsChanged()"
+               onfocus="formFieldsChanged()">
+         </td>
+      </tr>
+
+      <tr id="postform_row_comment">
+         <td class="label" id="postform_label_comment">
+            Kommentar:
+         </td>
+         <td align="left">
+            <textarea id="postform_comment" tabindex="5" name="internal_t"
+               cols="48" rows="4" wrap=soft
+               onchange="formFieldsChanged()"
+               onfocus="formFieldsChanged()"></textarea>
+            <img src="/images/button-expand.gif"
+               onmouseover="helpTip('Textfeld vergr&ouml;&szlig;ern/verkleinern')"
+               onclick="toggleTextareaSize('postform_comment', 48, 4, 75, 12)"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         </td>
+      </tr>
+
+      <tr id="postform_info_row" style="display: none">
+         <td class="label">Information:</td>
+         <td class="postform_info_notice" align="left"
+            id="postform_info">
+         </td>
+      </tr>
+
+      <tr id="postform_row_progress" style="display:none">
+         <td class="label">Fortschritt:</td>
+         <td>
+            <div id="postform_progress_bar" class="progressbar">
+               <div style="width: 0%">
+                  <p></p>
+               </div>
+            </div>
+         </td>
+      </tr>
+
+      
+      <tr id="postform_row_captcha" style="display: none">
+         <td class="label" id="postform_label_captcha">
+            Verifizierung:
+         </td>
+
+         <td align="left" valign="middle">
+            <input type=hidden name="captcha_name">
+            <img id="captcha_image">
+            <input type=text size=8 name="captcha_secret">
+         </td>
+      </tr>
+
+      
+      <tr id="postform_row_files">
+         <td class="label" id="postform_label_files" rowspan="1">
+            Datei:
+         </td>
+         <td align="left" id="files_parent">
+            <div>
+               <input type=file tabindex="7" name="file_0"
+                  onchange="fileFieldChanged()">
+            </div>
+         </td>
+      </tr>
+      
+
+      
+      <tr>
+         <td class="label">Danach zu:</td>
+         <td align="left">
+            <input tabindex="8" id="forward_board" type="radio" name="forward" value="board" checked> <label for="forward_board">/kc/</label>
+            
+            <input tabindex="9" id="forward_thread" type="radio" name="forward" value="thread"> <label for="forward_thread">neuem Thread</label>
+            
+            <input tabindex="2" id="forward_remember" type="checkbox" name="forward_remember">
+               <label for="forward_remember">Merken</label>
+         </td>
+      </tr>
+
+      <tr>
+         <td class="label">Passwort:</td>
+         <td align="left">
+            <input tabindex="10" type=password size=8
+               name="password" onchange="formFieldsChanged()"
+               onfocus="formFieldsChanged()">
+            (zum L&ouml;schen von Posts, optional)
+         </td>
+      </tr>
+
+      <tr id="rules_row">
+         <td colspan="2">
+            <ul style="text-align: left; margin: 15px">
+               <li>Erlaubte Dateitypen: GIF, JPG, PNG, PSD, MP3, OGG, RAR, ZIP, BitTorrent, Flash
+               <li>Maximale Anzahl Dateien pro Post: 4
+               
+                  <li>Maximale Dateigr&ouml;&szlig;e: 3.0 MB
+               
+               
+               
+                  <li><b>Vor dem Posten die Regeln lesen.</b>
+               
+            </ul>
+         </td>
+      </tr>
+   </table>
+
+   <input type=hidden name="board" value="kc">
+
+   
+   
+</form>
+
+
+
+
+<form action="/paint">
+   
+      <input type="hidden" name="action" value="new">
+      <input type="hidden" name="board" value="kc">
+      
+   
+
+   Zeichnen:
+   <select name="applet">
+      <option value="shipainter" selected>Shi-Painter</option>
+      <option value="shipainterpro">Shi-Painter Pro</option>
+   </select>
+   Breite:
+   <input type="text" name="width" size="3" value="800">
+   H&ouml;he:
+   <input type="text" name="height" size="3" value="600"><br>
+   Optionen:
+   [<input type="checkbox" name="animation" value="1" checked>Animation]
+   <input type="submit" value="Los!">
+
+</form>
+
+
+
+
+<script type="text/javascript">
+   /* restore user name and forward settings
+    */
+
+   if ((configGet('user.name') != null) &&
+      (typeof($('postform')['internal_n']) != "undefined"))
+      $('postform')['internal_n'].setValue(configGet('user.name'));
+
+   if (configGet('postform.forward') != null)
+   {
+      var target = configGet('postform.forward');
+
+      $('postform').select('input[name="forward"]').each(
+         function(e) { e.checked = (e.value == target) ? true : false; });
+   }
+</script>
+
+
+
+<script type="text/javascript">
+   var trackingId;
+   var lastUpdateTime = 0;
+   var lastUpdateValue = -1;
+   var uploadSize = 0;
+   var fileCounter = 1;
+   var maxFiles = 4;
+   var replyThread = null;
+   var maxCommentLength = 4500;
+   var maxFormFieldLength = 200;
+   var drawingsSubmitted = 0;
+
+   var boardRequiresCaptcha = true;
+   var captchaId = null;
+
+   var postCheckDone = false;
+   var postCheckRequested = false;
+   var submitAfterCheck = false;
+   var msgs =
+   {
+      captchaRequired: "F&uuml;r deinen Standort ist Captcha-Eingabe erforderlich.",
+      postingProhibited: "Von deinem Standort aus kann momentan nicht gepostet werden.",
+      postcheck: "Postberechtigung &uuml;berpr&uuml;fen...",
+      postcheckFailed: new Template("Postberechtigung konnte nicht verifiziert werden (#{error})"),
+      noCommentNoFiles: "Post enth&auml;lt weder Dateien noch einen Kommentar.",
+      newThreadsNeedComments: "Neue Threads m&uuml;ssen einen Kommentar enthalten.",
+      newThreadsNeedFiles: "Neue Threads m&uuml;ssen mindestens eine Datei enthalten.",
+      captchaMissing: "Captcha fehlt.",
+      fieldTooLong: new Template("Text zu lang (#{length} Zeichen), erlaubt sind höchstens #{max} Zeichen."),
+      commentTooLong: new Template("Kommentar zu lang (#{length} Zeichen), erlaubt sind höchstens #{max} Zeichen.")
+   };
+
+   function PostformMessageDisplay(displayContainer, boxContainer)
+   {
+      this.displayContainer = displayContainer;
+      this.boxContainer = boxContainer;
+      this.boxes = {};
+
+      this.clear = function(id)
+      {
+         if (!(id in this.boxes))
+            return;
+
+         this.boxContainer.removeChild(this.boxes[id]);
+         delete(this.boxes[id]);
+
+         this.hideShow();
+      }
+
+      this.show = function(id, error, content)
+      {
+         var box;
+
+         if (!(id in this.boxes))
+         {
+            box = $(Builder.node('div'));
+            this.boxContainer.appendChild(box);
+            this.boxes[id] = box;
+         }
+
+         else
+            box = this.boxes[id];
+
+         if (error)
+         {
+            box.removeClassName('postform_info_notice');
+            box.addClassName('postform_info_error');
+         }
+
+         else
+         {
+            box.removeClassName('postform_info_error');
+            box.addClassName('postform_info_notice');
+         }
+
+         box.innerHTML = content;
+
+         this.hideShow();
+      }
+
+      this.hideShow = function()
+      {
+         var i = 0;
+
+         for(id in this.boxes)
+            i++;
+
+         if (i > 0)
+            this.displayContainer.show();
+
+         else
+            this.displayContainer.hide();
+      }
+   }
+
+   var postformInformation =
+      new PostformMessageDisplay($('postform_info_row'), $('postform_info'));
+
+   var postformProgressBar =
+      new ProgressBar($('postform_progress_bar'));
+
+   /**
+    * Function: generateID
+    *
+    * Makes an effort to generate a somewhat unique ID from the current
+    * board's name, the current thread's postnumber, the user's session
+    * cookie, the current time and a random number. These are never used
+    * on the server for anything critical, obviously.
+    *
+    * Returns:
+    *  Generated ID.
+    */
+
+   function generateID()
+   {
+      id = 'kc';
+      
+
+      if (cookieGet('desuchan.session') != null)
+         id += '-' + cookieGet('desuchan.session');
+
+      id += '-' + new Date().getTime();
+      id += '-' + Math.round(100000000 * Math.random());
+
+      return(id);
+   }
+
+   /**
+    * Function: requestCaptcha
+    *
+    * Asks the server to generate a new captcha.
+    *
+    * Parameters:
+    *  replaceOld - If true, a new captcha will be requested even if there's
+    *   already one.
+    */
+
+   function requestCaptcha(replaceOld)
+   {
+      var form;
+
+      if ((captchaId != null) && (!replaceOld))
+         return;
+
+      captchaId = generateID();
+
+      $('captcha_image').src = '/captcha?id=' + captchaId;
+      $('postform_row_captcha').show();
+
+      form = $('postform');
+
+      form['captcha_name'].value = captchaId;
+   }
+
+   /**
+    * Function: clearCaptcha
+    *
+    * Hides the captcha field.
+    */
+
+   function clearCaptcha()
+   {
+      var form;
+
+      captchaId = null;
+      $('postform_row_captcha').hide();
+      $('captcha_image').src = '';
+
+      form = $('postform');
+
+      form['captcha_name'].clear();
+   }
+
+   /**
+    * Function: fixLinks
+    *
+    * Replaces URLs in the post text that point to other posts with proper
+    * links. Because a surprisingly large number of people are just too
+    * fucking stupid to get it right. Unterschicht detected.
+    *
+    * (Some extremely dumb individuals still manage to paste in URLs without
+    * the protocol field, which means they won't be caught by the regex. And
+    * others turn off Javascript because they think of themselves as SUPAR
+    * SMARTY SECURITY EXPERT MEN but still are too retarded to understand
+    * how links work on DesuChan. These people should just be shot on sight.)
+    *
+    * FIXME: Move this to server since the wizard style explanation is gone
+    * now anyway.
+    *
+    * Parameters:
+    *  text - Post text to fix.
+    *
+    * Returns:
+    *  Fixed version with URLs replaced by links.
+    */
+
+   function fixLinks(text)
+   {
+      var r;
+
+      linkExp = /http:\/\/(?:www.)*krautchan\.net\/(\S+)\/thread-(\d+)\.html(#q?(\d+))*/ig;
+
+      if (!linkExp.test(text))
+         return(text);
+
+      r = text.replace(linkExp, function(s, board, thread, anchor, post)
+         {
+            var t;
+            var p;
+            var r;
+
+            /* if no postnumber is inluded in the URL via a # at the
+             * end, the target post is the target thread's OP.
+             */
+
+            if (post == '')
+               p = thread;
+
+            else
+               p = post;
+
+            /* links that point to the current board just need the
+             * target postnumber.
+             */
+
+            if (board == 'kc')
+               r = ">>" + p;
+
+            /* links that point to other boards need the target postnumber
+             * to be prefixed with the target board's shortname.
+             */
+
+            else
+               r = ">>/" + board + "/" + p;
+
+            return(r);
+         });
+
+      return(r);
+   }
+
+   /**
+    * Function: fileFieldsChanged
+    *
+    * Called when a file field was changed (i.e. a file was added
+    * or removed).
+    */
+
+   function fileFieldChanged()
+   {
+      updateFileFields();
+      formFieldsChanged();
+   }
+
+   /**
+    * Function: updateFileFields
+    *
+    * Makes sure there's exactly one free file field available in the post
+    * form if the user hasn't already reached the maximum number of files
+    * per post. The maximum also includes pictures that were submitted with
+    * a paint applet and are already on the server.
+    *
+    * This function will remove empty fields if there's more than one
+    * of them as well as add a new field to the bottom of the list if
+    * all others are full and we're still below the maximum.
+    */
+
+   function updateFileFields()
+   {
+      var parent;
+      var fields;
+      var numFields;
+      var emptyFields;
+      var newField;
+      var i;
+
+      parent = $('files_parent');
+
+      numFields = 0;
+      emptyFields = 0;
+
+      fields = parent.select('input');
+
+      /* count empty fields
+       */
+
+      for(i = 0; i < fields.length; i++)
+      {
+         numFields++;
+
+         if (fields[i].value.length == 0)
+            emptyFields++;
+      }
+
+      /* add new field if all fields on the page are in use
+       * and the maximum number hasn't been reached
+       */
+
+      if ((emptyFields == 0) && (numFields < maxFiles))
+      {
+         newField = Builder.node('div', {},
+            Builder.node('input', { type: 'file',
+               name: 'file_' + fileCounter++, tabindex: 7,
+               onchange: 'fileFieldChanged()' }));
+
+         parent.appendChild(newField);
+      }
+
+      /* if there's more than one empty field, remove all
+       * except one
+       */
+
+      for(i = 0; ((i < fields.length) && (emptyFields > 1)); i++)
+         if (fields[i].value.length == 0)
+         {
+            fields[i].up().removeChild(fields[i]);
+            emptyFields--;
+         }
+   }
+
+   /**
+    * Function: countFiles
+    *
+    * Counts the number of non-empty file upload fields in the post form.
+    *
+    * Returns:
+    *  File count.
+    */
+
+   function countFiles()
+   {
+      var i = 0;
+
+      $('files_parent').select('input').each(
+         function(e) { if (e.getValue() != '') i++; });
+
+      return(i);
+   }
+
+   /**
+    * Function: toggleTextareaSize
+    *
+    * Toggles the size of the comment field between the standard (small)
+    * size and a larger one that stretches over the whole window width to
+    * make entering long and boring posts more comfortable.
+    *
+    * Will install an event handler when switching to large that adjusts
+    * the field's size accordingly when the window size changes. This
+    * handler will be uninstalled on switching back to small.
+    *
+    * FIXME: The cols2 and rows2 parameters are obsolete, currently only
+    * used for recognizing the current size setting, need to be removed and
+    * replaced with something else. Or maybe they provide some backward
+    * compatibility for people with shitty browsers? But I have no mercy
+    * for those faggoty anyway.
+    *
+    * Parameters:
+    *  textareaID - ID of comment field element
+    *  cols1 - Number of columns in small mode
+    *  rows1 - Number of rows in small mode
+    *  cols2 - Number of columns in small mode
+    *  rows2 - Number of rows in small mode
+    */
+
+   function toggleTextareaSize(textareaId, cols1, rows1, cols2, rows2)
+   {
+      var textarea = $(textareaId);
+
+      if ((textarea.rows == rows1) && (textarea.cols == cols1))
+      {
+         $('postform_comment').setAttribute("style",
+            "width:" + parseInt(window.innerWidth * 0.8) + "px");
+
+         Event.observe(window, 'resize',
+            function(e)
+            {
+               $('postform_comment').setAttribute("style",
+                  "width:" + parseInt(window.innerWidth * 0.8) + "px");
+            });
+
+         textarea.cols = cols2;
+         textarea.rows = rows2;
+      }
+
+      else
+      {
+         textarea.removeAttribute("style");
+         textarea.cols = cols1;
+         textarea.rows = rows1;
+
+         Event.stopObserving(window, 'resize');
+      }
+   }
+
+   /**
+    * Function: onSubmit
+    *
+    * Called when the user tries to submit the post form. Does the
+    * following, in this order:
+    *
+    * - Clears highlighting for any form fields that had errors the last
+    *   time a submit was attempted.
+    * - Saves the user's settings for the name field and the forwarding
+    *   target if the user has checked the 'remember' boxes.
+    * - Checks the form for any obvious errors (missing fields, text too
+    *   long, captcha not entered, etc.), shows error messages and
+    *   highlights the corresponding fields.
+    * - Stops the submit process if any errors were found.
+    * - If no errors were found, clears any (old) messages related to form
+    *   input checking and disables the submit button.
+    * - Checks if the AJAX checkpost function was already called.
+    * - If the call hasn't been made yet, it's done now.
+    * - If the call is still in progress or was just started in the last
+    *   step, displays a 'checking post permission' message and sets a
+    *   flag indicating that the handler for the checkpost function should
+    *   submit the form again once the call returns and no other errors are
+    *   found.
+    * - If the call was completed successfully, fix any post links in the
+    *   comment text, setup upload progress tracking and let the browser
+    *   go ahead with the post request.
+    */
+
+   function onSubmit()
+   {
+      var form;
+      var comment;
+      var textTooLong = false;
+
+      unHighlightLabels();
+
+      form = $('postform');
+
+      /* save user name / forward preferences
+       */
+
+      if ((typeof(form['name_remember']) != 'undefined') &&
+         (form['name_remember'].checked))
+         configSet('user.name', form['internal_n'].getValue());
+
+      if (form['forward_remember'].checked)
+         form.select('input[name="forward"]').each(
+            function(e)
+            {
+               if (e.checked)
+                  configSet('postform.forward', e.value);
+            }
+         );
+
+      /* check input fields
+       */
+
+      /* 1. comment length
+       */
+
+      comment = form['internal_t'].getValue().trim();
+
+      if (comment.length > maxCommentLength)
+      {
+         postformInformation.show('formcheck', true,
+            msgs.commentTooLong.evaluate(
+               { length: comment.length, max: maxCommentLength }));
+         highlightLabel('comment');
+         textTooLong = true;
+      }
+
+      if (textTooLong)
+         return(false);
+
+      /* 2. posts with no files and no comment are pretty worthless
+       */
+
+      if (((countFiles() + drawingsSubmitted) == 0) && (comment == ''))
+      {
+         postformInformation.show('formcheck', true,
+            msgs.noCommentNoFiles);
+         highlightLabel('comment');
+         highlightLabel('files');
+         return(false);
+      }
+
+      /* 3. new threads need a comment as well as at least one file
+       */
+
+      if (replyThread == null)
+      {
+         if (comment == '')
+         {
+            postformInformation.show('formcheck', true,
+               msgs.newThreadsNeedComments);
+            highlightLabel('comment');
+            return(false);
+         }
+
+         if ((countFiles() + drawingsSubmitted) == 0)
+         {
+            postformInformation.show('formcheck', true,
+               msgs.newThreadsNeedFiles);
+            highlightLabel('files');
+            return(false);
+         }
+      }
+
+      /* 4. make sure captcha secret was entered, if required
+       */
+
+      if ((boardRequiresCaptcha) &&
+          (form['captcha_secret'].getValue().trim() == ''))
+      {
+         postformInformation.show('formcheck', true, msgs.captchaMissing);
+         highlightLabel('captcha');
+         return(false);
+      }
+
+      postformInformation.clear('formcheck');
+
+      /* disable submit button
+       */
+
+      $('postform_submit').disable();
+
+      /* pre-post checks already run?
+       */
+
+      if (!postCheckDone)
+      {
+         postformInformation.show('postcheck', false, msgs.postcheck);
+
+         submitAfterCheck = true;
+
+         if (!postCheckRequested)
+            postCheck();
+
+         return(false);
+      }
+
+      /* fix links in post text
+       */
+
+      document.forms.postform.internal_t.value =
+         fixLinks(document.forms.postform.internal_t.value);
+
+      /* generate progress tracking id & start timer
+       */
+
+      setupProgressTracking();
+
+      return(true);
+   }
+
+   /**
+    * Function: highlightLabel
+    *
+    * Highlights the label of a post form field to indicate an error.
+    *
+    * Parameters:
+    *  name - The field's name
+    */
+
+   function highlightLabel(name)
+   {
+      var label;
+
+      label = $('postform_label_' + name);
+
+      label.addClassName('label_highlighted');
+      label.removeClassName('label');
+   }
+
+   /**
+    * Function: unHighlightLabels
+    *
+    * Removes highlighting done by <highlightLabel> on all post form
+    * fields.
+    */
+
+   function unHighlightLabels()
+   {
+      $('postform').select('td.label_highlighted').each(
+         function(e)
+         {
+            e.addClassName('label');
+            e.removeClassName('label_highlighted');
+         }
+      )
+   }
+
+   /**
+    * Function: setupProgressTracking
+    *
+    * Generates an upload tracking ID and starts a timer that will initiate
+    * queries to the upload progress tracker if the upload takes longer than
+    * a set time interval (so that not every text-only post or small image
+    * macros initiate progress tracking).
+    */
+
+   function setupProgressTracking()
+   {
+      trackingId = 'kc';
+      
+      trackingId += '-' + cookieGet('desuchan.session');
+      trackingId += '-' + new Date().getTime();
+      trackingId += '-' + Math.round(100000000 * Math.random())
+
+      $('postform').action += '?X-Progress-ID=' + trackingId;
+
+      setTimeout(function() { requestProgressUpdate(); }, 5000);
+   }
+
+   /**
+    * Function: requestProgressUpdate
+    *
+    * Calls the upload tracker on the server, passes the response to
+    * <updateProgressDisplay> and schedules a new call to itself if
+    * the tracker's response indicates that the upload hasn't been
+    * completed yet.
+    */
+
+   function requestProgressUpdate()
+   {
+      new Ajax.Request('/progress',
+         { method: 'get',
+           requestHeaders: ['X-Progress-ID', trackingId],
+           onSuccess: function(r) { updateProgressDisplay(r) },
+           onComplete: function(r)
+           {
+              if ((uploadSize != lastUpdateValue) && (uploadSize > 0))
+                 setTimeout(requestProgressUpdate, 750)
+           }
+         });
+   }
+
+   /**
+    * Function: updateProgressDisplay
+    *
+    * Updates the upload progress bar with information from the server's
+    * upload tracker.
+    *
+    * Parameters:
+    *   request - Upload tracker AJAX request with response data
+    */
+
+   function updateProgressDisplay(request)
+   {
+      var v = request.responseText.split(' ');
+      var t = new Date().getTime();
+      var speed;
+      var secondsleft;
+      var s;
+
+      v = eval(request.responseText);
+
+      if (isNaN(v.received) || isNaN(v.size))
+         return;
+
+      $('postform_row_progress').show();
+
+      s = Math.round(v.received / 1024) + ' kB / ' +
+          Math.round(v.size / 1024) + ' kB';
+
+      if (lastUpdateTime != 0)
+      {
+         speed = Math.round((v.received - lastUpdateValue) /
+            (t - lastUpdateTime) / 1024 * 1000);
+
+         secondsleft = ((v.size - v.received) / 1024) / speed;
+
+         s += sprintf(" (%d kB/s, %d:%02d)", speed,
+            Math.floor(secondsleft / 60), Math.floor(secondsleft % 60));
+      }
+
+      lastUpdateTime = t;
+      lastUpdateValue = v.received;
+      uploadSize = v.size;
+
+      postformProgressBar.setValues(v.received, v.size);
+      postformProgressBar.setLabel(s);
+   }
+
+   /**
+    * Function: formFieldsChanged
+    *
+    * Called when the user does something with the post form fields, not
+    * necessarily changing them. Assumes the user wants to post and requests
+    * a captcha (if required) and calls checkpost.
+    */
+
+   function formFieldsChanged()
+   {
+      if (boardRequiresCaptcha)
+         requestCaptcha(false);
+
+      if (!postCheckDone)
+         postCheck();
+   }
+
+   /**
+    * Function: postCheck
+    *
+    * Calls DesuChan's AJAX checkpost function.
+    */
+
+   function postCheck()
+   {
+      new Ajax.Request('/ajax/checkpost',
+         { method: 'get',
+           parameters: { board: 'kc' },
+           onComplete: postCheckHandler });
+   }
+
+   /**
+    * Function: postCheckHandler
+    *
+    * Processes the response from the postcheck AJAX call. Does the
+    * following:
+    *
+    * - Checks if the call completed successfully. If not, displays an
+    *   error message and resets all flags, indicating that the call must
+    *   be attempted again. (Aborts pending form submit)
+    * - If if was successful, clears all old messages related to it.
+    * - If the response indicates that the client is not allowed to
+    *   post on the target board, disable the post form and display
+    *   an error message.
+    * - If the response indicates that captcha verification is required
+    *   for the client regardless of the board setting and there's no
+    *   captcha, request one and display an info message. (Aborts pending
+    *   form submit)
+    * - If the response indicates that the user never has to pass captcha
+    *   verification regardless of the board setting and there's a captcha,
+    *   remove it.
+    * - If the user has already submitted the form and we were just waiting
+    *   for the postcheck call to complete and there are no error conditions,
+    *   go ahead with it.
+    *
+    * Parameters:
+    *  r - postcheck response
+    */
+
+   function postCheckHandler(r)
+   {
+      var response;
+      var error;
+      var canSubmit = true;
+
+      var captchaReason = msgs.captchaRequired;
+      var prohibitReason = msgs.postingProhibited;
+
+      // lol was
+      if (r.status == 0)
+      {
+         postCheckDone = false;
+         postCheckRequested = false;
+         submitAfterCheck = false;
+         return;
+      }
+
+      if (r.status != 200)
+         error = 'HTTP ' + r.status;
+
+      else if (r.responseJSON == null)
+         error = 'JSON';
+
+      else if (!r.responseJSON.success)
+      {
+         var i;
+         var m;
+         var errors;
+
+         m = r.responseJSON;
+         errors = [];
+
+
+         for(i = 0; i < m.messages.length; i++)
+         {
+            if (m.messages[i][0] == 'error')
+               errors.push(m.messages[i][1]);
+         }
+
+         if (errors.length == 0)
+            error = 'DesuChan';
+
+         else
+            error = errors.join(', ');
+      }
+
+      if (error != null)
+      {
+         postformInformation.show('postcheck', true,
+            msgs.postcheckFailed.evaluate({ error: error }));
+         postCheckDone = false;
+         postCheckRequested = false;
+         submitAfterCheck = false;
+         $('postform_submit').enable();
+         return;
+      }
+
+      postformInformation.clear('postcheck');
+
+      response = r.responseJSON.data;
+
+      postCheckDone = true;
+      canSubmit = true;
+
+      if (('prohibit_posting' in response) && (response.prohibit_posting))
+      {
+         if ('prohibit_reason' in response)
+            prohibitReason = response.prohibit_reason;
+
+         $('postform').disable();
+         postformInformation.show('postcheck', true, prohibitReason);
+         return;
+      }
+
+      if ('captchas' in response)
+      {
+         switch(response.captchas)
+         {
+            case('always'):
+               if (captchaId == null)
+               {
+                  if ('captcha_reason' in response)
+                     captchaReason = response.captcha_reason;
+
+                  requestCaptcha(false);
+                  postformInformation.show('postcheck', false,
+                     captchaReason);
+                  canSubmit = false;
+               }
+               break;
+
+            case('never'):
+               if (captchaId != null)
+               {
+                  $('postform_row_captcha').hide();
+                  boardRequiresCaptcha = false;
+               }
+               break;
+         }
+      }
+
+      if (!canSubmit)
+      {
+         $('postform_submit').enable();
+      }
+
+      else if (submitAfterCheck)
+      {
+         if (onSubmit())
+            $('postform').submit();
+      }
+   }
+
+   // ach firefox...
+   Event.observe(window, 'load', function(e)
+      { $('postform').enable(); postCheckDone = false;
+        postCheckRequested = false; submitAfterCheck = false;
+        updateFileFields(); captchaId = null; });
+</script>
+
+
+      </center>
+
+      <form action="/delete" method=post>
+         
+      
+         <div class="thread" style="clear: both" id="thread_29380">
+            <hr>
+
+            
+            
+
+            
+            <a name="29380"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29380" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29380)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-23 16:35:17.232651</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29380" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29380#q29380" class=quotelink>
+               29380</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+            [<a href="/board/kc/thread/29380">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109518894" style="display:none">football.jpg</span>
+               <span class="filename"><a href="/download/1337783717001.jpg/football.jpg"
+                  onmouseover="fileNameTooltip(true, '109518894')"
+                  onmouseout="fileNameTooltip(false, '109518894')"></span>
+                  football.jpg</a>
+               
+               <img id="button_expand_image_109518894" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109518894,
+                     '/thumbnails/1337783717001.jpg', 200, 145,
+                     '/files/1337783717001.jpg', 550, 400)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29380&modify=109518894&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   550x400,
+   
+   53 kB
+</span><br>
+               <a href="/files/1337783717001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109518894' src=/thumbnails/1337783717001.jpg
+                        onmouseover="fileTooltip(109518894)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109518894)"
+                        width="200"
+                        height="145">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29380">Wie stehen die Chancen auf die R&uuml;ckkehr eines Sportbretts?</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+               <span class="omittedinfo">
+               
+                  1 Post(s) nicht angezeigt.
+               
+               </span>
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29383"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29383">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29383" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-24 19:03:58.167838</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29380#29383" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29380#q29383" class=quotelink>
+               29383</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29383"><a href="/board/kc/thread/29380#29382">&gt;&gt;29382</a><br>Ist doch Jacke wie Hose.<br>Europameisterschaft und Olympiade stehen am Horizont und danach folgt das normale Tagesgesch&auml;ft, da w&uuml;rde eine Wiederbelebung des Sportbretts schon Sinn machen.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29384"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29384">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29384" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-24 21:18:44.856679</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29380#29384" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29380#q29384" class=quotelink>
+               29384</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29384">Haltet alle die Fresse</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29390"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29390">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29390" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-25 10:43:51.626388</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29380#29390" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29380#q29390" class=quotelink>
+               29390</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29390"><span class="quote">&gt;<a href="#29383" onclick="highlightPost('29383');">&gt;&gt;29383</a></span><br><span class="quote">&gt;Olympiade</span><br>http://de.wikipedia.org/wiki/Olympiade</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29395"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29395">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29395" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-25 17:15:51.233572</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29380#29395" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29380#q29395" class=quotelink>
+               29395</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29395"><a href="#29383" onclick="highlightPost('29383');">&gt;&gt;29383</a><br><span class="quote">&gt;Olympiade</span><br>Stimmt, die F&auml;den zu verschiedensten olympischen Disziplinen gingen ja immer auf Autos&auml;ge.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29380)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29380</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_29371">
+            <hr>
+
+            
+            
+
+            
+            <a name="29371"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29371" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29371)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 14:25:19.863957</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29371" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29371#q29371" class=quotelink>
+               29371</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+            <img src="/images/locked.gif" onmouseover="helpTip('Thread geschlossen')"
+               onmouseout="UnTip()">
+         
+         
+         
+            [<a href="/board/kc/thread/29371">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109452571" style="display:none">1309663602001.jpg</span>
+               <span class="filename"><a href="/download/1337689519001.jpg/1309663602001.jpg"
+                  onmouseover="fileNameTooltip(true, '109452571')"
+                  onmouseout="fileNameTooltip(false, '109452571')"></span>
+                  1309663602001.jpg</a>
+               
+               <img id="button_expand_image_109452571" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109452571,
+                     '/thumbnails/1337689519001.jpg', 200, 134,
+                     '/files/1337689519001.jpg', 600, 404)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29371&modify=109452571&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   600x404,
+   
+   160 kB
+</span><br>
+               <a href="/files/1337689519001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109452571' src=/thumbnails/1337689519001.jpg
+                        onmouseover="fileTooltip(109452571)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109452571)"
+                        width="200"
+                        height="134">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29371">Ability to add signatures or banning all butthurt mods who hate on signatures. I don&#39;t understand why someone would have something against using signatures. It&#39;s the next step of *chan evolution<br>___________________________<br>&quot;no thinking atheist would consider themselves fully atheistic, as atheism arises from a lack of evidence and evidence can always change a thinking person&#39;s mind&quot;</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+               <span class="omittedinfo">
+               
+                  1 Post(s) nicht angezeigt.
+               
+               </span>
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29373"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29373">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29373" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 14:58:52.950835</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29371#29373" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29371#q29373" class=quotelink>
+               29373</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29373"><a href="/board/kc/thread/29371#29372">&gt;&gt;29372</a><br>Exactly<br>___________________________<br>&quot;no thinking atheist would consider themselves fully atheistic, as atheism arises from a lack of evidence and evidence can always change a thinking person&#39;s mind&quot;<br><br>98% of teens dont no what dubstep or skillkrex is!!!!<br>put this in ur sig if you are part of the 2% who do!!!</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29374"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29374">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29374" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 15:50:31.739029</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29371#29374" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29371#q29374" class=quotelink>
+               29374</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29374">Problem is, your sig is always the sigs of the two posts above you combined. Gets out of hand pretty quickly.<br>__________________________<br>98% of teens dont no what dubstep or skillkrex is!!!!<br>put this in ur sig if you are part of the 2% who do!!!<br><br>&quot;no thinking atheist would consider themselves fully atheistic, as atheism arises from a lack of evidence and evidence can always change a thinking person&#39;s mind&quot;<br><br>98% of teens dont no what dubstep or skillkrex is!!!!<br>put this in ur sig if you are part of the 2% who do!!!</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29375"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29375">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29375" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 15:56:21.82088</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29371#29375" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29371#q29375" class=quotelink>
+               29375</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+                        <div class="file_reply">
+                           <span id="filename_109456722" style="display:none">signaturearebestDandassburgermods.png</span>
+                           <span class="filename"><a href="/download/1337694981001.png/signaturearebestDandassburgermods.png"
+                              onmouseover="fileNameTooltip(true, '109456722')"
+                              onmouseout="fileNameTooltip(false, '109456722')">signaturearebest[...].png</a></span>
+                           
+                              <img id="button_expand_image_109456722" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109456722,
+                                    '/thumbnails/1337694981001.png', 200, 116,
+                                    '/files/1337694981001.png', 1006, 586)"
+                                    style="cursor: pointer">
+                           
+                           
+                              <a href="/paint?action=new&board=kc&thread=29371&modify=109456722&applet=shipainter"
+                                 onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                              <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   PNG,
+   
+   1006x586,
+   
+   330 kB
+</span><br>
+                           <a href="/files/1337694981001.png" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109456722' src=/thumbnails/1337694981001.png
+                                    onmouseover="fileTooltip(109456722)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109456722)"
+                                    width="200"
+                                    height="116">
+                              
+                           </a>
+                        </div>
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29375">ylilauta is best<br><br><br><br><br>___________________________<br>!!!JOIN THE DARKTERRORKILLER CLAN!!!<br><br>98% of teens dont no what dubstep or skillkrex is!!!!<br>put this in ur sig if you are part of the 2% who do!!!</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29378"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29378">
+
+                     
+                     
+      
+      
+      <div class="userinfo" id="userinfo_29378"
+         style="display: none">
+         <b>Username:</b>
+         Shaky
+         <i>(Administrator)</i><br>
+         
+         <b>E-Mail:</b>
+         shaky@krautchan.net<br>
+         
+      </div>
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29378" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         <span class="authority_admin">## Admin ##</span>
+         
+         
+         <span class="postdate">2012-05-22 20:13:29.901642</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29371#29378" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29371#q29378" class=quotelink>
+               29378</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+                        <div class="file_reply">
+                           <span id="filename_109471619" style="display:none">beating_dead_horse.gif</span>
+                           <span class="filename"><a href="/download/1337710409001.gif/beating_dead_horse.gif"
+                              onmouseover="fileNameTooltip(true, '109471619')"
+                              onmouseout="fileNameTooltip(false, '109471619')">beating_dead_horse.gif</a></span>
+                           
+                              <img id="button_expand_image_109471619" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109471619,
+                                    '/thumbnails/1337710409001.gif', 200, 154,
+                                    '/files/1337710409001.gif', 300, 232)"
+                                    style="cursor: pointer">
+                           
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   GIF,
+   
+   300x232, [A],
+   
+   129 kB
+</span><br>
+                           <a href="/files/1337710409001.gif" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109471619' src=/thumbnails/1337710409001.gif
+                                    onmouseover="fileTooltip(109471619)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109471619)"
+                                    width="200"
+                                    height="154">
+                              
+                           </a>
+                        </div>
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29378">Very funny, you guys. Move along now.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29371)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29371</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_29366">
+            <hr>
+
+            
+            
+
+            
+            <a name="29366"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29366" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29366)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 03:44:04.07543</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29366" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29366#q29366" class=quotelink>
+               29366</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+            <img src="/images/locked.gif" onmouseover="helpTip('Thread geschlossen')"
+               onmouseout="UnTip()">
+         
+         
+         
+            [<a href="/board/kc/thread/29366">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109434835" style="display:none">sn.png</span>
+               <span class="filename"><a href="/download/1337651044001.png/sn.png"
+                  onmouseover="fileNameTooltip(true, '109434835')"
+                  onmouseout="fileNameTooltip(false, '109434835')"></span>
+                  sn.png</a>
+               
+               <img id="button_expand_image_109434835" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109434835,
+                     '/thumbnails/1337651044001.png', 177, 200,
+                     '/files/1337651044001.png', 400, 450)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29366&modify=109434835&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   PNG,
+   
+   400x450,
+   
+   192 kB
+</span><br>
+               <a href="/files/1337651044001.png" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109434835' src=/thumbnails/1337651044001.png
+                        onmouseover="fileTooltip(109434835)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109434835)"
+                        width="177"
+                        height="200">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29366">We need an international porn board. Something like Northpole /e/.</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29367"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29367">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29367" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 04:13:49.101732</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29366#29367" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29366#q29367" class=quotelink>
+               29367</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29367">And i need a GF, guess what? nobody cares!</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29368"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29368">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29368" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 04:39:11.920854</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29366#29368" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29366#q29368" class=quotelink>
+               29368</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29368">...No we don&#39;t. <span class="spoiler">Unless you let me post gayporn all day every day. Or actually, I&#39;d ignore it.</span></p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29369"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29369">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29369" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-22 05:10:13.73331</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29366#29369" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29366#q29369" class=quotelink>
+               29369</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29369"><a href="#29368" onclick="highlightPost('29368');">&gt;&gt;29368</a><br>It would be for every kind of porn.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29370"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29370">
+
+                     
+                     
+      
+      
+      <div class="userinfo" id="userinfo_29370"
+         style="display: none">
+         <b>Username:</b>
+         Der General
+         <i>(Administrator)</i><br>
+         
+         <b>E-Mail:</b>
+         general@krautchan.net<br>
+         
+      </div>
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29370" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         <span class="authority_admin">## Admin ##</span>
+         
+         
+         <span class="postdate">2012-05-22 07:52:37.716806</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29366#29370" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29366#q29370" class=quotelink>
+               29370</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29370">Nope.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29366)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29366</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_29319">
+            <hr>
+
+            
+            
+
+            
+            <a name="29319"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29319" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29319)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-19 19:17:06.403013</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29319" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29319#q29319" class=quotelink>
+               29319</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+            [<a href="/board/kc/thread/29319">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109281388" style="display:none">screenshot_20120519-185959.jpg</span>
+               <span class="filename"><a href="/download/1337447826001.jpg/screenshot_20120519-185959.jpg"
+                  onmouseover="fileNameTooltip(true, '109281388')"
+                  onmouseout="fileNameTooltip(false, '109281388')"></span>
+                  screenshot_20120[...].jpg</a>
+               
+               <img id="button_expand_image_109281388" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109281388,
+                     '/thumbnails/1337447826001.jpg', 200, 143,
+                     '/files/1337447826001.jpg', 468, 336)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29319&modify=109281388&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   468x336,
+   
+   46 kB
+</span><br>
+               <a href="/files/1337447826001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109281388' src=/thumbnails/1337447826001.jpg
+                        onmouseover="fileTooltip(109281388)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109281388)"
+                        width="200"
+                        height="143">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29319">Guatemala braucht einen Ball.<br><br>krautchan.net/int/thread-11679347.html</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29320"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29320">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29320" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-19 23:33:02.479598</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29319#29320" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29319#q29320" class=quotelink>
+               29320</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+                        <div class="file_reply">
+                           <span id="filename_109296427" style="display:none">gt.PNG</span>
+                           <span class="filename"><a href="/download/1337463182001.png/gt.PNG"
+                              onmouseover="fileNameTooltip(true, '109296427')"
+                              onmouseout="fileNameTooltip(false, '109296427')">gt.PNG</a></span>
+                           
+                              <img id="button_expand_image_109296427" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109296427,
+                                    '/thumbnails/1337463182001.png', 17, 14,
+                                    '/files/1337463182001.png', 17, 14)"
+                                    style="cursor: pointer">
+                           
+                           
+                              <a href="/paint?action=new&board=kc&thread=29319&modify=109296427&applet=shipainter"
+                                 onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                              <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   PNG,
+   
+   17x14,
+   
+   293 bytes
+</span><br>
+                           <a href="/files/1337463182001.png" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109296427' src=/thumbnails/1337463182001.png
+                                    onmouseover="fileTooltip(109296427)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109296427)"
+                                    width="17"
+                                    height="14">
+                              
+                           </a>
+                        </div>
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29320"></p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29336"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29336">
+
+                     
+                     
+      
+      
+      <div class="userinfo" id="userinfo_29336"
+         style="display: none">
+         <b>Username:</b>
+         Der General
+         <i>(Administrator)</i><br>
+         
+         <b>E-Mail:</b>
+         general@krautchan.net<br>
+         
+      </div>
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29336" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         <span class="authority_admin">## Admin ##</span>
+         
+         
+         <span class="postdate">2012-05-20 10:43:58.984209</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29319#29336" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29319#q29336" class=quotelink>
+               29336</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29336">Done.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29381"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29381">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29381" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-24 00:00:14.711767</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29319#29381" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29319#q29381" class=quotelink>
+               29381</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+                        <div class="file_reply">
+                           <span id="filename_109544262" style="display:none">bs.PNG</span>
+                           <span class="filename"><a href="/download/1337810414001.png/bs.PNG"
+                              onmouseover="fileNameTooltip(true, '109544262')"
+                              onmouseout="fileNameTooltip(false, '109544262')">bs.PNG</a></span>
+                           
+                              <img id="button_expand_image_109544262" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109544262,
+                                    '/thumbnails/1337810414001.png', 17, 25,
+                                    '/files/1337810414001.png', 17, 25)"
+                                    style="cursor: pointer">
+                           
+                           
+                              <a href="/paint?action=new&board=kc&thread=29319&modify=109544262&applet=shipainter"
+                                 onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                              <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   PNG,
+   
+   17x25,
+   
+   302 bytes
+</span><br>
+                           <a href="/files/1337810414001.png" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109544262' src=/thumbnails/1337810414001.png
+                                    onmouseover="fileTooltip(109544262)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109544262)"
+                                    width="17"
+                                    height="25">
+                              
+                           </a>
+                        </div>
+                     
+                        <div class="file_reply">
+                           <span id="filename_109544263" style="display:none">ke.PNG</span>
+                           <span class="filename"><a href="/download/1337810414002.png/ke.PNG"
+                              onmouseover="fileNameTooltip(true, '109544263')"
+                              onmouseout="fileNameTooltip(false, '109544263')">ke.PNG</a></span>
+                           
+                              <img id="button_expand_image_109544263" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109544263,
+                                    '/thumbnails/1337810414002.png', 17, 25,
+                                    '/files/1337810414002.png', 17, 25)"
+                                    style="cursor: pointer">
+                           
+                           
+                              <a href="/paint?action=new&board=kc&thread=29319&modify=109544263&applet=shipainter"
+                                 onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                              <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   PNG,
+   
+   17x25,
+   
+   325 bytes
+</span><br>
+                           <a href="/files/1337810414002.png" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109544263' src=/thumbnails/1337810414002.png
+                                    onmouseover="fileTooltip(109544263)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109544263)"
+                                    width="17"
+                                    height="25">
+                              
+                           </a>
+                        </div>
+                     
+                        <div class="file_reply">
+                           <span id="filename_109544264" style="display:none">gt.PNG</span>
+                           <span class="filename"><a href="/download/1337810414003.png/gt.PNG"
+                              onmouseover="fileNameTooltip(true, '109544264')"
+                              onmouseout="fileNameTooltip(false, '109544264')">gt.PNG</a></span>
+                           
+                              <img id="button_expand_image_109544264" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                                 onmouseout="UnTip()" onclick="toggleThumbnail(109544264,
+                                    '/thumbnails/1337810414003.png', 17, 25,
+                                    '/files/1337810414003.png', 17, 25)"
+                                    style="cursor: pointer">
+                           
+                           
+                              <a href="/paint?action=new&board=kc&thread=29319&modify=109544264&applet=shipainter"
+                                 onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                              <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   PNG,
+   
+   17x25,
+   
+   360 bytes
+</span><br>
+                           <a href="/files/1337810414003.png" target="_blank">
+                              
+                                 <img style="display: block" id='thumbnail_109544264' src=/thumbnails/1337810414003.png
+                                    onmouseover="fileTooltip(109544264)"
+                                    onmouseout="UnTip()"
+                                    onload="imageFinishedLoading(109544264)"
+                                    width="17"
+                                    height="25">
+                              
+                           </a>
+                        </div>
+                     
+                        <div class="file_reply">
+                           <span id="filename_109544266" style="display:none">KC Balls.zip</span>
+                           <span class="filename"><a href="/download/1337810414004.zip/KC%20Balls.zip"
+                              onmouseover="fileNameTooltip(true, '109544266')"
+                              onmouseout="fileNameTooltip(false, '109544266')">KC Balls.zip</a></span>
+                           
+                           
+                           
+                           <br>
+                           <span class="fileinfo">
+   ZIP,
+   
+   1827 Dateien,
+   
+   1.3 MB
+</span><br>
+                           <a href="/files/1337810414004.zip" target="_blank">
+                              
+                                 <img src="/images/icon-archive-zip.gif" onmouseover="fileTooltip(109544266)" onmouseout="UnTip()">
+                              
+                           </a>
+                        </div>
+                     
+
+                     
+                     <div style="clear: both"></div>
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29381">Thanks, Admin.<br><br>Ball archive updated.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29319)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29319</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_29361">
+            <hr>
+
+            
+            
+
+            
+            <a name="29361"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29361" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29361)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject">Checking post permission eternal wait</span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-21 12:36:06.492035</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29361" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29361#q29361" class=quotelink>
+               29361</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+            [<a href="/board/kc/thread/29361">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109387993" style="display:none">optimism.jpg</span>
+               <span class="filename"><a href="/download/1337596566001.jpg/optimism.jpg"
+                  onmouseover="fileNameTooltip(true, '109387993')"
+                  onmouseout="fileNameTooltip(false, '109387993')"></span>
+                  optimism.jpg</a>
+               
+               <img id="button_expand_image_109387993" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109387993,
+                     '/thumbnails/1337596566001.jpg', 200, 150,
+                     '/files/1337596566001.jpg', 500, 375)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29361&modify=109387993&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   500x375,
+   
+   72 kB
+</span><br>
+               <a href="/files/1337596566001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109387993' src=/thumbnails/1337596566001.jpg
+                        onmouseover="fileTooltip(109387993)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109387993)"
+                        width="200"
+                        height="150">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29361">I have issues with posting pics. <br>It just says for a brief moment:<br><span class="quote">&gt;Checking post permission</span><br><br>then says waiting for krautchan.net and noting happens. <br><br>What is the issue here?</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29362"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29362">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29362" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-21 17:43:29.66489</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29361#29362" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29361#q29362" class=quotelink>
+               29362</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29362">1. Clear Cache<br>2. Clear Cookies<br>3. Try again, if it still doesn&#39;t work:<br>4. Paste browser version and error console output here.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29361)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29361</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_28921">
+            <hr>
+
+            
+            
+
+            
+            <a name="28921"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_28921" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(28921)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject">Reisebrett</span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-04-27 20:18:26.084083</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/28921" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/28921#q28921" class=quotelink>
+               28921</a>
+         
+         </span>
+         
+         
+         
+         <span class="sage">[AUTOSAGE]</span>
+         
+         
+         
+         
+         
+         
+            [<a href="/board/kc/thread/28921">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_108026339" style="display:none">Columbia_River_Gorge.jpg</span>
+               <span class="filename"><a href="/download/1335550705001.jpg/Columbia_River_Gorge.jpg"
+                  onmouseover="fileNameTooltip(true, '108026339')"
+                  onmouseout="fileNameTooltip(false, '108026339')"></span>
+                  Columbia_River_Gorge.jpg</a>
+               
+               <img id="button_expand_image_108026339" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(108026339,
+                     '/thumbnails/1335550705001.jpg', 200, 150,
+                     '/files/1335550705001.jpg', 2592, 1944)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=28921&modify=108026339&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   2592x1944,
+   
+   1.7 MB
+</span><br>
+               <a href="/files/1335550705001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_108026339' src=/thumbnails/1335550705001.jpg
+                        onmouseover="fileTooltip(108026339)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(108026339)"
+                        width="200"
+                        height="150">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_28921">/r/ ein Reisebrett/Urlaubsbrett. Solche F&auml;den sind immer sehr wertvoll, landen meist bei /fb/ und bekommen nicht genug W&uuml;rdigung. Es fehlt definitiv. <br><br>Bild relatiert: Ein Urlaubsfoto. <br><br>kA ob das hier oft vorgeschlagen wird, bin nie auf /kc/, drinvor Bann.</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+               <span class="omittedinfo">
+               
+                  13 Post(s) nicht angezeigt.
+               
+               </span>
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29244"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29244">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29244" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-13 21:00:04.789098</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/28921#29244" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/28921#q29244" class=quotelink>
+               29244</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29244"><a href="/board/kc/thread/28921#29242">&gt;&gt;29242</a><br>Naja, zwischen Berndcon und Couchsurfing ist ja doch auch ein Unterschied. Zwischen &quot;Jemanden auf seiner Couch schlafen lassen&quot; und &quot;Mit Keinbernds Party machen&quot; kann ja doch noch klar unterschieden werden, im Notfall muss der Mod halt hart durchgreifen und alles und jeden bannieren, der einen Berndconfaden aufmacht.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29245"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29245">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29245" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-13 21:04:35.35148</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/28921#29245" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/28921#q29245" class=quotelink>
+               29245</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29245">Ich unterst&uuml;tze den Vorschlag eines Reisebrettes auch sehr, jedoch m&uuml;sste es schon international sein um sein Sein zu rechtfertigen. Ein rein deutsches Reisebrett w&auml;re meiner Meinung nach weder sonderlich interessant, noch w&uuml;rde es h&auml;ufig frequentiert werden.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29355"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29355">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29355" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-21 00:24:06.639673</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/28921#29355" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/28921#q29355" class=quotelink>
+               29355</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29355"><a href="/board/kc/thread/28921#29228">&gt;&gt;29228</a><br><span class="quote">&gt;und auf /n/ geht es doch nur um Botanik, oder etwa nicht?</span><br><br>Nein. Solche F&auml;den m&ouml;gen im Moment &uuml;berwiegen, aber urspr&uuml;nglich sollte es mal um alles gehen, was mit Aktivit&auml;ten in der Natur oder &quot;im Freien&quot; zu tun hat.<br><br>Ich kann mir nicht vorstellen, dass ein Reisebrett wirklich ann&auml;hernd aktiv sein k&ouml;nnte. Ich verstehe auch nicht, warum man nicht nach /vip/ ausweichen sollte, wo ist das Problem?<br>Ansonsten k&ouml;nnte man vielleicht um eine offizielle Themenerweiterung von /n/ nachdenken, vielleicht zu Natur &amp; Reisen, so w&uuml;rden vielleicht beide Themenbereiche von den &Uuml;berschneidungen profitieren.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29360"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29360">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29360" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-21 10:10:13.746098</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/28921#29360" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/28921#q29360" class=quotelink>
+               29360</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29360"><a href="#29355" onclick="highlightPost('29355');">&gt;&gt;29355</a><br>/n/ ist ein deutsches Brett, /trv/ eher international.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(28921)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">28921</span>
+               </span>
+            </div>
+
+         </div>
+      
+         <div class="thread" style="clear: both" id="thread_29346">
+            <hr>
+
+            
+            
+
+            
+            <a name="29346"></a>
+            <div class="thread_body">
+            
+            
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29346" value="delete" type="checkbox">
+         
+         
+            <img src="/images/button-close.gif"
+               onclick="hideThread(29346)"
+               onmouseover="helpTip('Thread ausblenden')"
+               onmouseout="UnTip()"
+               style="cursor: pointer">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject">/em/</span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-20 19:31:53.082264</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29346" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29346#q29346" class=quotelink>
+               29346</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+            [<a href="/board/kc/thread/29346">Antworten</a>]
+         
+      </div>
+   
+         
+            <div class="file_thread">
+               <span id="filename_109347375" style="display:none">kickersTOP.jpg</span>
+               <span class="filename"><a href="/download/1337535113001.jpg/kickersTOP.jpg"
+                  onmouseover="fileNameTooltip(true, '109347375')"
+                  onmouseout="fileNameTooltip(false, '109347375')"></span>
+                  kickersTOP.jpg</a>
+               
+               <img id="button_expand_image_109347375" src="/images/button-expand.gif" onmouseover="helpTip('Thumbnail/Bild umschalten')"
+                  onmouseout="UnTip()" onclick="toggleThumbnail(109347375,
+                     '/thumbnails/1337535113001.jpg', 200, 153,
+                     '/files/1337535113001.jpg', 380, 291)"
+                     style="cursor: pointer">
+               
+               
+               <a href="/paint?action=new&board=kc&thread=29346&modify=109347375&applet=shipainter"
+                  onmouseover="helpTip('Bild bearbeiten')" onmouseout="UnTip()">
+                  <img src="/images/button-paint.gif" border="0" width="15" height="15"></a>
+               
+               
+               <br>
+               <span class="fileinfo">
+   JPG,
+   
+   380x291,
+   
+   24 kB
+</span><br>
+               <a href="/files/1337535113001.jpg" target="_blank">
+                  
+                     <img style="display: block" id='thumbnail_109347375' src=/thumbnails/1337535113001.jpg
+                        onmouseover="fileTooltip(109347375)"
+                        onmouseout="UnTip()"
+                        onload="imageFinishedLoading(109347375)"
+                        width="200"
+                        height="153">
+                  
+               </a>
+            </div>
+         
+
+            
+
+            <div class="postbody">
+               <blockquote>
+                  <p id="post_text_29346">Bernd schl&auml;gt ein <b>tempor&auml;res</b> Brett f&uuml;r die Dauer der Fu&szlig;ball-EM vor, um /b/ nicht wie gestern w&auml;hrend des Champions-League-Finales voll zukrebsen. Au&szlig;erdem haben wir gerade so wenige Trialbretter.</p>
+                  
+                  
+               </blockquote>
+            </div>
+
+            
+
+            
+
+            
+
+               
+               
+
+               
+               <a name="29347"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29347">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29347" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject">[-]</span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-20 19:43:28.791763</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29346#29347" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29346#q29347" class=quotelink>
+               29347</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29347">Ich fordere tempor&auml;re Unterbrette f&uuml;r Wolfgang, Lolibernd und PI-News-Ronny. Die krebsen n&auml;mlich auch immer /b/ voll und ich will das nicht sehen und so...<br>Au&szlig;erdem Bann f&uuml;r alle, die Zeug posten, was mir nicht gef&auml;llt.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29349"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29349">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29349" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-20 20:23:47.402953</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29346#29349" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29346#q29349" class=quotelink>
+               29349</a>
+         
+         </span>
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29349">Dann werden trotzdem F&auml;den auf /b/ er&ouml;ffnet. In 2010 wurde w&auml;hrend der WM (aber nicht von Anfang an) pro Deutschland-Spiel ein Faden klebrig gemacht und das hat doch meiner Erinnerung nach gut funktioniert. Das k&ouml;nnte aber auch daran liegen, dass der Krebs gr&ouml;&szlig;tenteils nicht lauerte, weil er z.B. Rudelgucken war.</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+
+               
+               
+
+               
+               <a name="29356"></a>
+
+               <table>
+
+                  <td valign=top>&gt;&gt;</td>
+
+                  <td class=postreply id="post-29356">
+
+                     
+                     
+      
+      
+      
+      <div class="postheader">
+         
+         <input name="post_29356" value="delete" type="checkbox">
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         
+         <span class="postsubject"></span>
+         
+         <span class="postername">Bernd</span>
+         
+         
+         
+         
+         
+         
+         <span class="postdate">2012-05-21 00:37:26.870328</span>
+         
+         <span class="postnumber">
+         
+            <a href="/board/kc/thread/29346#29356" class="quotelink">
+               Nr.</a>
+            <a href="/board/kc/thread/29346#q29356" class=quotelink>
+               29356</a>
+         
+         </span>
+         
+         <span class="sage">SAGE!</span>
+         
+         
+         
+         
+         
+         
+         
+         
+      </div>
+   
+
+                     
+
+                     
+
+                     
+
+                     <div>
+                        <blockquote>
+                           <p id="post_text_29356">Ein Faden gestern. Vielleicht noch den anderen, der nach zwei Minuten auf Seite 7 war. Ich mag auch keinen Fu&szlig;ball aber da nervt mich PI-News-Ronny schon eher und die bleiben auch nicht auf /p/</p>
+                           
+                           
+                        </blockquote>
+                     </div>
+                  </td>
+
+               </table>
+            
+            </div>
+            <div class="thread_hidden">
+               <img src="/images/button-open.gif" onclick="showThread(29346)" onmouseover="helpTip('Thread anzeigen')"
+                  onmouseout="UnTip()" style="cursor: pointer">
+               <span class="hidden_thread">
+                     Thread ausgeblendet:
+                  <span style="font-weight: bold">29346</span>
+               </span>
+            </div>
+
+         </div>
+      
+
+         <div style="clear: both"></div>
+         <hr>
+
+      
+         <div style="position: absolute; left: 5px;">
+         <table border=1>
+            <tr>
+               <td>
+                  Seiten:
+               </td>
+
+               
+               
+               <td>
+                  [<a href="/kc/8.html">Vorherige</a>]
+               </td>
+               
+
+               <td>
+                  
+                  
+                     
+                        <a href="/kc/">1</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/1.html">2</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/2.html">3</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/3.html">4</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/4.html">5</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/5.html">6</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/6.html">7</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/7.html">8</a>
+                     
+                     
+                  
+                     
+                        <a href="/kc/8.html">9</a>
+                     
+                     
+                  
+                     
+                        [10]
+                     
+                     
+                  
+               </td>
+
+               
+            </tr>
+         </table>
+         </div>
+      
+
+         <div style="position: absolute; right: 5px;">
+            Passwort: <input type=password size=8 name="password">
+            <input type=submit value="L&ouml;schen">
+            <input type=hidden name="board" value="kc">
+         </div>
+      </form>
+
+      <br><br><br>
+
+      
+      
+      [
+         
+            <a href="/b/" onmouseover="helpTip('Der Prozess')" onmouseout="UnTip()">b</a> /
+         
+            <a href="/int/" onmouseover="helpTip('International')" onmouseout="UnTip()">int</a> /
+         
+            <a href="/vip/" onmouseover="helpTip('Beste der Besten')" onmouseout="UnTip()">vip</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/a/" onmouseover="helpTip('Anime & Manga')" onmouseout="UnTip()">a</a> /
+         
+            <a href="/c/" onmouseover="helpTip('Computer')" onmouseout="UnTip()">c</a> /
+         
+            <a href="/co/" onmouseover="helpTip('Comics & Cartoons')" onmouseout="UnTip()">co</a> /
+         
+            <a href="/d/" onmouseover="helpTip('Drogen')" onmouseout="UnTip()">d</a> /
+         
+            <a href="/e/" onmouseover="helpTip('Essen & Trinken')" onmouseout="UnTip()">e</a> /
+         
+            <a href="/f/" onmouseover="helpTip('Fahrzeuge')" onmouseout="UnTip()">f</a> /
+         
+            <a href="/fb/" onmouseover="helpTip('Frag Bernd')" onmouseout="UnTip()">fb</a> /
+         
+            <a href="/fit/" onmouseover="helpTip('Fitness')" onmouseout="UnTip()">fit</a> /
+         
+            <a href="/jp/" onmouseover="helpTip('Otakuhimmel')" onmouseout="UnTip()">jp</a> /
+         
+            <a href="/k/" onmouseover="helpTip('Kreatives')" onmouseout="UnTip()">k</a> /
+         
+            <a href="/l/" onmouseover="helpTip('Literatur')" onmouseout="UnTip()">l</a> /
+         
+            <a href="/li/" onmouseover="helpTip('Lifestyle')" onmouseout="UnTip()">li</a> /
+         
+            <a href="/m/" onmouseover="helpTip('Musik')" onmouseout="UnTip()">m</a> /
+         
+            <a href="/n/" onmouseover="helpTip('Natur & Tierwelt')" onmouseout="UnTip()">n</a> /
+         
+            <a href="/p/" onmouseover="helpTip('Politik & News')" onmouseout="UnTip()">p</a> /
+         
+            <a href="/ph/" onmouseover="helpTip('Philosophie')" onmouseout="UnTip()">ph</a> /
+         
+            <a href="/sp/" onmouseover="helpTip('Spielzeug')" onmouseout="UnTip()">sp</a> /
+         
+            <a href="/t/" onmouseover="helpTip('Technik')" onmouseout="UnTip()">t</a> /
+         
+            <a href="/tv/" onmouseover="helpTip('Film & Fernsehen')" onmouseout="UnTip()">tv</a> /
+         
+            <a href="/v/" onmouseover="helpTip('Videospiele')" onmouseout="UnTip()">v</a> /
+         
+            <a href="/w/" onmouseover="helpTip('Wissenschaft')" onmouseout="UnTip()">w</a> /
+         
+            <a href="/board/we/" onmouseover="helpTip('Weltschmerz')" onmouseout="UnTip()">we</a> /
+         
+            <a href="/wp/" onmouseover="helpTip('Wallpaper')" onmouseout="UnTip()">wp</a> /
+         
+            <a href="/x/" onmouseover="helpTip('Paranormales')" onmouseout="UnTip()">x</a> /
+         
+            <a href="/z/" onmouseover="helpTip('Zeichnen')" onmouseout="UnTip()">z</a> /
+         
+            <a href="/zp/" onmouseover="helpTip('MS Paint')" onmouseout="UnTip()">zp</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/ng/" onmouseover="helpTip('Geld & Finanz')" onmouseout="UnTip()">ng</a> /
+         
+            <a href="/prog/" onmouseover="helpTip('/prog/')" onmouseout="UnTip()">prog</a> /
+         
+            <a href="/wk/" onmouseover="helpTip('Waffen & Krieg')" onmouseout="UnTip()">wk</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/h/" onmouseover="helpTip('Hentai')" onmouseout="UnTip()">h</a> /
+         
+            <a href="/s/" onmouseover="helpTip('Sexy Frauen')" onmouseout="UnTip()">s</a> 
+         
+      ]
+      
+      [
+         
+            <a href="/kc/" onmouseover="helpTip('Krautchan')" onmouseout="UnTip()">kc</a> /
+         
+            <a href="/rfk/" onmouseover="helpTip('Radio Freies Krautchan')" onmouseout="UnTip()">rfk</a> 
+         
+      ]
+      
+   
+
+      <script type="text/javascript">
+         Event.observe(window, 'load', onLoad);
+
+         function onLoad()
+         {
+            var match;
+
+            if (match = /#q([0-9]+)$/.exec(document.location.toString()))
+               quote(match[1]);
+
+            if (match = /#([0-9]+)$/.exec(document.location.toString()))
+               highlightPost(match[1]);
+
+            
+            
+            
+         }
+      </script>
+
+      <style type="text/css">
+   div.disclaimer_screen
+   {
+      background: #000000;
+      position: absolute;
+      width: 98%;
+      height: 98%;
+      top: 0;
+      left: 0;
+      opacity: 0;
+   }
+
+   div.disclaimer
+   {
+      border: #000000 solid 7px;
+      background: #aaaacc;
+      position: absolute;
+      width: 550px;
+      top: 0;
+      left: 0;
+   }
+
+   div.disclaimer div.titlebar
+   {
+      background: #313370;
+      color: #ffffff;
+      font-weight: bold;
+      font-size: 15px;
+      text-align: center;
+      padding: 5px;
+   }
+
+   div.disclaimer div.disclaimer_text
+   {
+      padding: 20px;
+      background-color: #eeeeee;
+      margin: 4px;
+   }
+
+   div.disclaimer div.disclaimer_text a
+   {
+      display: inline;
+   }
+
+   div.disclaimer div.disclaimer_text ol
+   {
+      list-style: disc;
+   }
+
+   div.disclaimer div.disclaimer_text ol li
+   {
+      margin: 5px 0px;
+   }
+
+   div.disclaimer div.disclaimer_text div.disclaimer_question
+   {
+      background-color: #cccccc;
+      padding: 4px;
+      text-align: center;
+   }
+</style>
+
+<div class="disclaimer_screen" id="disclaimer_screen"
+   style="display: none">
+</div>
+
+<div id="disclaimer" class="disclaimer" style="display: none">
+   <div class="titlebar">
+      Hinweis / Notice
+   </div>
+
+   <div class="disclaimer_text">
+      <img src="/images/flags/de.png">
+      <ol>
+         <li>
+            Diese Site ist f&uuml;r Leute mit gesundem Menschenverstand
+            und Humor gedacht, die mit Sarkasmus, Ironie und Zynismus
+            umgehen k&ouml;nnen. Denk gr&uuml;ndlich nach, bevor du etwas,
+            das hier gepostet wurde, f&uuml;r bare M&uuml;nze nimmst.
+         </li>
+         <li>
+            Dar&uuml;ber hinaus enth&auml;lt sie teilweise Dinge, die
+            nur f&uuml;r ein erwachsenes Publikum geeignet sind. Wenn du
+            minderj&auml;hrig bist, geh bitte
+            <a href="http://www.knuddelz.de" target="_top">woanders</a> hin.
+         </li>
+         <li>Bevor du hier <i>irgendwas</i> tust, mach dich mit den
+            <a href="/regeln.html">Regeln</a> vertraut.
+         </li>
+      </ol>
+      <div class="disclaimer_question">
+         Glaubst du, das bekommst du hin?
+         <a href="#" onclick="disclaimerClose()"><b>Ja</b></a> |
+         <a href="http://www.google.com" target="_top"><b>Nein</b></a>
+      </div>
+   </div>
+
+   <div class="disclaimer_text">
+      <img src="/images/flags/us.png">
+      <ol>
+         <li>
+            This site is meant for people with common sense and humor
+            who can deal with sarcasm, irony and cynicism. Think carefully
+            before you take something that was posted here at face value.
+         </li>
+         <li>
+            Furthermore, it contains some things that are only suitable
+            for an adult audience. If you're a minor, please go
+            <a href="http://www.gaia.com" target="_top">somewhere else</a>.
+         </li>
+         <li>
+            Before you do <i>anything</i> here, familiarize
+            yourself with the <a href="/regeln.html">rules</a>.
+         </li>
+      </ol>
+      <div class="disclaimer_question">
+         Think you can do that?
+         <a href="#" onclick="disclaimerClose()"><b>Yes</b></a> |
+         <a href="http://www.google.com" target="_top"><b>No</b></a>
+      </div>
+   </div>
+</div>
+
+<script type="text/javascript">
+
+   if (!configGet('disclaimer_seen'))
+   {
+      disclaimerCenter();
+      new Effect.Opacity('disclaimer_screen',
+         { from: 0, to: 0.925, duration: 2 });
+
+      $('disclaimer').show();
+      $('disclaimer_screen').show();
+
+      Event.observe(window, 'resize', disclaimerCenter);
+      Event.observe(window, 'scroll', disclaimerCenter);
+   }
+
+   function disclaimerCenter()
+   {
+      centerElement($('disclaimer'));
+      centerElement($('disclaimer_screen'));
+   }
+
+   function centerElement(element)
+   {
+      var offsets = document.viewport.getScrollOffsets();
+
+      element.style.left =
+         parseInt((document.viewport.getWidth() / 2) -
+            (element.getWidth() / 2) + offsets[0]) + 'px';
+
+      element.style.top =
+         parseInt((document.viewport.getHeight() / 2) -
+            (element.getHeight() / 2) + offsets[1]) + 'px';
+   }
+
+   function disclaimerClose()
+   {
+      $('disclaimer').hide();
+      $('disclaimer_screen').hide();
+      Event.stopObserving(window, 'resize', disclaimerCenter);
+      Event.stopObserving(window, 'scroll', disclaimerCenter);
+      configSet('disclaimer_seen', 1);
+   }
+</script>
+
+
+      
+
+      
+
+
+   
+      
+<div id="fileinfo_109518894" style="display: none; min-width: 400px">
+   <b>Name:</b> football.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 53 kB (54609 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 550x400<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+         
+      
+         
+      
+         
+      
+   
+
+   
+      
+<div id="fileinfo_109452571" style="display: none; min-width: 400px">
+   <b>Name:</b> 1309663602001.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 160 kB (163941 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 600x404<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+         
+      
+         
+            
+<div id="fileinfo_109456722" style="display: none; min-width: 400px">
+   <b>Name:</b> signaturearebestDandassburgermods.png<br>
+   <b>Gr&ouml;&szlig;e:</b> 330 kB (338668 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 1006x586<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+      
+         
+            
+<div id="fileinfo_109471619" style="display: none; min-width: 400px">
+   <b>Name:</b> beating_dead_horse.gif<br>
+   <b>Gr&ouml;&szlig;e:</b> 129 kB (132141 bytes)<br>
+   <b>Typ:</b> GIF<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 300x232<br>
+      
+      <b>Animation:</b> 6 Frames<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+      
+   
+
+   
+      
+<div id="fileinfo_109434835" style="display: none; min-width: 400px">
+   <b>Name:</b> sn.png<br>
+   <b>Gr&ouml;&szlig;e:</b> 192 kB (197287 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 400x450<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+         
+      
+         
+      
+         
+      
+   
+
+   
+      
+<div id="fileinfo_109281388" style="display: none; min-width: 400px">
+   <b>Name:</b> screenshot_20120519-185959.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 46 kB (47527 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 468x336<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+            
+<div id="fileinfo_109296427" style="display: none; min-width: 400px">
+   <b>Name:</b> gt.PNG<br>
+   <b>Gr&ouml;&szlig;e:</b> 293 bytes (293 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 17x14<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+      
+         
+      
+         
+            
+<div id="fileinfo_109544262" style="display: none; min-width: 400px">
+   <b>Name:</b> bs.PNG<br>
+   <b>Gr&ouml;&szlig;e:</b> 302 bytes (302 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 17x25<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+            
+<div id="fileinfo_109544263" style="display: none; min-width: 400px">
+   <b>Name:</b> ke.PNG<br>
+   <b>Gr&ouml;&szlig;e:</b> 325 bytes (325 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 17x25<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+            
+<div id="fileinfo_109544264" style="display: none; min-width: 400px">
+   <b>Name:</b> gt.PNG<br>
+   <b>Gr&ouml;&szlig;e:</b> 360 bytes (360 bytes)<br>
+   <b>Typ:</b> PNG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 17x25<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+         
+            
+<div id="fileinfo_109544266" style="display: none; min-width: 400px">
+   <b>Name:</b> KC Balls.zip<br>
+   <b>Gr&ouml;&szlig;e:</b> 1.3 MB (1333122 bytes)<br>
+   <b>Typ:</b> ZIP<br>
+
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+      <hr>
+      <b>Anzahl der Dateien:</b> 1827<br>
+      
+      <hr>
+      
+      <b>Dateien (erste 15):</b><br>
+      
+      
+      Krautchan Countryballs/1 Countryball Map.png <i>(51 kB)</i><br>
+      
+      Krautchan Countryballs/al.PNG <i>(223 bytes)</i><br>
+      
+      Krautchan Countryballs/am.PNG <i>(209 bytes)</i><br>
+      
+      Krautchan Countryballs/ar.PNG <i>(262 bytes)</i><br>
+      
+      Krautchan Countryballs/at.PNG <i>(216 bytes)</i><br>
+      
+      Krautchan Countryballs/au.PNG <i>(339 bytes)</i><br>
+      
+      Krautchan Countryballs/ax.PNG <i>(264 bytes)</i><br>
+      
+      Krautchan Countryballs/ba.PNG <i>(256 bytes)</i><br>
+      
+      Krautchan Countryballs/bavaria.PNG <i>(249 bytes)</i><br>
+      
+      Krautchan Countryballs/bd.PNG <i>(241 bytes)</i><br>
+      
+      Krautchan Countryballs/be.PNG <i>(223 bytes)</i><br>
+      
+      Krautchan Countryballs/bg.PNG <i>(225 bytes)</i><br>
+      
+      Krautchan Countryballs/bo.PNG <i>(275 bytes)</i><br>
+      
+      Krautchan Countryballs/br.PNG <i>(307 bytes)</i><br>
+      
+      Krautchan Countryballs/bs.PNG <i>(232 bytes)</i><br>
+      
+      
+      <i>[...]</i>
+      
+   
+</div>
+
+         
+      
+   
+
+   
+      
+<div id="fileinfo_109387993" style="display: none; min-width: 400px">
+   <b>Name:</b> optimism.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 72 kB (73738 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 500x375<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+   
+
+   
+      
+<div id="fileinfo_108026339" style="display: none; min-width: 400px">
+   <b>Name:</b> Columbia_River_Gorge.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 1.7 MB (1824961 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 2592x1944<br>
+      
+      
+      <hr>
+      
+      
+      
+      <b>Kamera:</b> Canon Canon PowerShot S2 IS<br>
+      
+      
+      
+      
+      <b>Besitzer:</b> John Russell<br>
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      <b>Erstellungsdatum:</b> 2006:07:21 18:31:49<br>
+      
+      
+      
+      
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+         
+      
+         
+      
+         
+      
+   
+
+   
+      
+<div id="fileinfo_109347375" style="display: none; min-width: 400px">
+   <b>Name:</b> kickersTOP.jpg<br>
+   <b>Gr&ouml;&szlig;e:</b> 24 kB (25412 bytes)<br>
+   <b>Typ:</b> JPG<br>
+
+   
+      <hr>
+      <b>Aufl&ouml;sung:</b> 380x291<br>
+      
+      
+      
+   
+
+   
+
+   
+
+   
+   
+   
+   
+   
+</div>
+
+      
+         
+      
+         
+      
+         
+      
+   
+
+
+
+   </body>
+</html>
