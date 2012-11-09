@@ -49,6 +49,10 @@ public class KCThread extends KrautObject {
 		this.setUri(uri);
 	}
 	
+	public void setUri(String uri) {
+		super.setUri(uri);
+	}
+	
 	public synchronized KCPosting getPosting (Long id) {
 		return postings.get(id);
 	}

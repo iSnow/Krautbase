@@ -80,7 +80,7 @@ public class RemoteTests extends TestCase {
 		reader.close();		
 		reader = new BufferedReader (new FileReader (page));
 		
-		domParserThreads = TestParser.parseBoardPage(reader, boardShortName);
+		domParserThreads = TestParser.parseBoardPage(reader);
 	}
 	
 

@@ -17,7 +17,7 @@ import org.jsoup.select.Elements;
 
 public class TestParser {
 	
-	public static Map<Long, KCThread> parseBoardPage(BufferedReader reader, String boardShortName) {
+	public static Map<Long, KCThread> parseBoardPage(BufferedReader reader) {
 		String content = "";
 		Map<Long, KCThread> domParserThreads = new LinkedHashMap<Long, KCThread>();	
 		try {
@@ -33,6 +33,10 @@ public class TestParser {
 			return null;
 		}
 		Document doc = Jsoup.parse(content);
+		String title = doc.select("title").first().text();
+		title = title.replaceAll("\\s+-\\s+.+", "").substring(1);
+		String boardShortName = title.substring(0, title.length()-1);
+		
 		Elements threads = doc.select("div.thread");
 		for (Element elem : threads) {
 			Long id = Long.parseLong(elem.id().replace("thread_", ""));

@@ -39,16 +39,16 @@ public class LocalTests extends TestCase {
 	protected void setUp() throws Exception {
 		super.setUp();
 		boardDbId = 1337;
-		boardPage = new File ("page_reduced.html");
+		/*boardPage = new File ("testdata/page_reduced.html");
 		threadPage = new File ("thread-29953.html");
 		if ((null == boardPage) || (!boardPage.exists())) {
 			TestCase.fail("Board Page file does not exist");
 		}
+		boardFileReader = new FileReader (boardPage);
 		if ((null == threadPage) || (!threadPage.exists())) {
 			TestCase.fail("Thread Page file does not exist");
 		}
-		boardFileReader = new FileReader (boardPage);
-		threadFileReader = new FileReader (boardPage);
+		threadFileReader = new FileReader (boardPage);*/
 	}
 	
 	@Override
@@ -68,7 +68,7 @@ public class LocalTests extends TestCase {
 		reader.close();		
 		reader = new BufferedReader (new FileReader (page));
 		
-		domParserThreads = TestParser.parseBoardPage(reader, "b");
+		domParserThreads = TestParser.parseBoardPage(reader);
 	}
 	
 	/*public void testParseBoardPage() throws Exception {
@@ -128,7 +128,6 @@ public class LocalTests extends TestCase {
 				System.out.println("JSOUP");
 				System.out.println(domParserThread);
 			}
-			System.out.println ("<#> "+key+ " "+ domParserThread.digest + " <-> "+newParserThread.digest);
 			Assert.assertTrue(newParserThread.equals(domParserThread));
 			//Assert.assertEquals(newParserThread.hashCode(), domParserThread.hashCode());
 		}
@@ -157,11 +156,13 @@ public class LocalTests extends TestCase {
 		for (File f: testFiles) {
 			newParserThreads = new LinkedHashMap<Long, KCThread>();
 			domParserThreads = new LinkedHashMap<Long, KCThread>();
+			System.out.println ("FILE: "+f.getName());
 			parseOneBoardPage(f);
 			for (Long key : newParserThreads.keySet()) {
 				KCThread domParserThread = domParserThreads.get(key);
 				KCThread newParserThread = newParserThreads.get(key);
 				if (!newParserThread.equals(domParserThread)) {	
+					System.out.println ("FILE: "+f.getName());
 					System.out.println("MINE");
 					System.out.println(newParserThread);
 					System.out.println("JSOUP");
@@ -176,13 +177,11 @@ public class LocalTests extends TestCase {
 	private KODataListener<KCThread> threadListener = new KODataListener<KCThread>() {
 		@Override
 		public void notifyAdded(KCThread item, Object token) {
-			System.out.println ("Added: "+item.getUri());
 			newParserThreads.put(item.kcNummer, item);
 		}
 
 		@Override
 		public void notifyDone(Object token) {
-			System.out.println ("Done: "+token.toString());
 		}
 
 		@Override
@@ -194,12 +193,10 @@ public class LocalTests extends TestCase {
 	private static KODataListener<KCPosting> postListener = new KODataListener<KCPosting>() {
 		@Override
 		public void notifyAdded(KCPosting item, Object token) {
-			System.out.println ("Added: "+item.getUri());
 		}
 
 		@Override
 		public void notifyDone(Object token) {
-			System.out.println ("Done: "+token.toString());
 		}
 
 		@Override
