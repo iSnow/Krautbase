@@ -364,9 +364,13 @@ public class KCPosting extends KrautObject implements Comparable<KCPosting>{
 		retVal += "Created: " 	+ getCreationDate()+"\n";
 		retVal += "Author: " 	+ getUser()+"\n";
 		retVal += "T-Code: " 	+ getTripCode()+"\n";
-		retVal += "Title: " 	+ getTitle()+"\n";
+		retVal += "Title: " 	+ getTitle().replaceAll("\\s+", " ")+"\n";
 		retVal += "Sage: " 		+ isSage()+"\n";
-		retVal += "Content: " 	+ StringEscapeUtils.unescapeHtml4(getOriginalContent()).replaceAll("\\s+", " ").replaceAll("<img (.+?)\">", "<img $1\" />").replaceAll("<a (.+?)\" >", "<a $1\">")+"\n";
+		retVal += "Content: " 	+ StringEscapeUtils.unescapeHtml4(getOriginalContent())
+			.replaceAll("\\s+", " ")
+			.replaceAll("\\s</", "</")
+			.replaceAll("<img (.+?)\">", "<img $1\" />")
+			.replaceAll("<a (.+?)\" >", "<a $1\">")+"\n";
 		retVal += "Imgs: \n";
 		String[] uids = getFileUids().toArray(new String[this.getFileUids().size()]);
 		for (int i = 0; i < uids.length; i++) {
